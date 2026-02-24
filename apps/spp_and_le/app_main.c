@@ -15,6 +15,7 @@
 #include "app_power_manage.h"
 #include "asm/charge.h"
 
+#include "examples/trans_data/ble_trans.h"
 
 #if TCFG_KWS_VOICE_RECOGNITION_ENABLE
 #include "jl_kws/jl_kws_api.h"
@@ -22,11 +23,11 @@
 
 #define LOG_TAG_CONST       APP
 #define LOG_TAG             "[APP]"
-#define LOG_ERROR_ENABLE
-#define LOG_DEBUG_ENABLE
-#define LOG_INFO_ENABLE
+//#define LOG_ERROR_ENABLE
+//#define LOG_DEBUG_ENABLE
+//#define LOG_INFO_ENABLE
 /* #define LOG_DUMP_ENABLE */
-#define LOG_CLI_ENABLE
+//#define LOG_CLI_ENABLE
 #include "debug.h"
 
 /*任务列表   */
@@ -116,9 +117,137 @@ void check_power_on_key(void)
 #endif
 }
 
+// Create a semaphore for RX notification
+UT_Semaphore rx_semaphore;
 
+static void my_uart_rx_callback(void *bus, u32 status)
+{
+    if (status == UT_RX) {
+        // Notify a waiting task that data is ready
+        UT_OSSemPost(&rx_semaphore);
+    }
+}
+
+static uint8_t rx_buffer[32];   // must be 2^n (e.g., 64, 128, 256...)
+
+struct uart_platform_data_t uart_cfg = {
+    .tx_pin       = IO_PORT_DP ,
+    .rx_pin       = IO_PORT_DM ,
+    .rx_cbuf      = rx_buffer,
+    .rx_cbuf_size = sizeof(rx_buffer),
+    .frame_length = 1,          // interrupt after each byte (or desired threshold)
+    .rx_timeout   = 10,         // timeout in ms (for OT interrupt)
+    .isr_cbfun    = my_uart_rx_callback,
+    .argv         = NULL,       // optional user data passed to callback
+    .is_9bit      = 0,
+    .baud         = 115200,
+    // other fields (if any) should be zeroed
+};
+
+/*
+static void uart_rx_task(void *p_arg)
+{
+    uart_bus_t *bus = (uart_bus_t *)p_arg;   // the UART bus pointer passed as argument
+    uint8_t byte;
+
+    while (1) {
+        // Wait for the semaphore posted by the UART callback
+        //UT_OSSemPend(&rx_semaphore, OS_WAIT_FOREVER);
+        UT_OSSemPend(&rx_semaphore, 600000);
+
+        // Read all available bytes (use timeout 0 for non blocking)
+        while (bus->getbyte(&byte, 0)) {
+            // Echo the byte back
+            bus->putbyte(byte);
+        }
+    }
+}
+*/
+
+//extern u16 trans_con_handle;
+#define ATT_CHARACTERISTIC_ae02_01_CLIENT_CONFIGURATION_HANDLE 0x000d
+#define ATT_CHARACTERISTIC_ae02_01_VALUE_HANDLE 0x000c
+
+static void uart_rx_task(void *p_arg)
+{
+    const uart_bus_t *uart_bus = (const uart_bus_t *)p_arg;
+    uint8_t byte;
+    // Buffer for accumulating a message (optional)
+    uint8_t msg_buffer[16];
+    uint32_t msg_len = 0;
+
+    while (1) {
+        // Wait for the semaphore posted by the UART callback
+        UT_OSSemPend(&rx_semaphore, 600000);
+
+        // Read all available bytes (non‑blocking inside the task)
+        while (uart_bus->getbyte(&byte, 0)) {
+            // Echo the byte back (optional)
+            uart_bus->putbyte(byte);
+
+            // Store byte in message buffer if you want to send larger chunks
+            if (msg_len < sizeof(msg_buffer)) {
+                msg_buffer[msg_len++] = byte;
+            }
+
+            // Optional: Break if buffer is full to process immediately
+            // This breaks the inner while loop so the code moves to the SEND logic
+            if (byte == '\r' || byte == '\n' || msg_len >= sizeof(msg_buffer)) {
+                break;
+            }
+        }
+
+        // If we have accumulated data and BLE is ready, send it
+        if (msg_len > 0 && trans_con_handle) {
+            //uart_bus->write("SEND\n", 5);
+            // Check if notifications are enabled for the characteristic
+            if (ble_gatt_server_characteristic_ccc_get(trans_con_handle,
+                    ATT_CHARACTERISTIC_ae02_01_CLIENT_CONFIGURATION_HANDLE) == 1) {
+                int ret = ble_comm_att_send_data(trans_con_handle,
+                                                 ATT_CHARACTERISTIC_ae02_01_VALUE_HANDLE,
+                                                 msg_buffer,
+                                                 msg_len,
+                                                 0);
+                /*
+                if (ret) {
+                    uart_bus->write("failed\n", 7);
+                } else {
+                    uart_bus->write("Sent\n", 5);
+                }
+                */
+            }
+            msg_len = 0; // reset buffer for next message
+        }
+
+        clr_wdt();
+        // No os_time_dly needed – we block on semaphore
+    }
+}
+
+void TestPrint(void *priv)
+{
+    const uart_bus_t *uart_bus = (const uart_bus_t *)priv;
+    // Now you can use uart_bus, for example:
+    uart_bus->write("Good\r\n", 8);
+}
+
+
+//static u16 timerID;
 void app_main()
 {
+    UT_OSSemCreate(&rx_semaphore, 0);
+    //const uart_bus_t *uart_bus = uart_dev_open(&uart_cfg);
+    const uart_bus_t *uart_bus = uart_dev_open(&uart_cfg);
+    int ret = os_task_create(
+        uart_rx_task,
+        (void *)uart_bus,
+        15,
+        128,                    // stack size in bytes (or words? check SDK docs)
+        0,                      // queue size (0 if not used)
+        "uart_rx"               // task name (for debugging)
+    );
+    //timerID = sys_timer_add((void *)uart_bus, TestPrint , 1000);
+
     struct intent it;
 
     if (!UPDATE_SUPPORT_DEV_IS_NULL()) {
@@ -127,7 +256,7 @@ void app_main()
     }
 
     printf(">>>>>>>>>>>>>>>>>app_main...\n");
-    printf(">>> v220,2022-11-23 >>>\n");
+    //printf(">>> v220,2022-11-23 >>>\n");
 
     if (get_charge_online_flag()) {
 #if(TCFG_SYS_LVD_EN == 1)
@@ -274,5 +403,4 @@ __attribute__((used)) int *__errno()
     static int err;
     return &err;
 }
-
 

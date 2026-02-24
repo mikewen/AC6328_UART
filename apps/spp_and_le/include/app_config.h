@@ -5,7 +5,7 @@
  * 系统打印总开关
  */
 
- #define CONFIG_RELEASE_ENABLE  1
+#define CONFIG_RELEASE_ENABLE  1
 
 #ifdef CONFIG_RELEASE_ENABLE
 #define LIB_DEBUG    0

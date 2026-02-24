@@ -117,7 +117,8 @@ static const u8 trans_PNP_ID[] = {PNP_VID_SOURCE, PNP_VID & 0xFF, PNP_VID >> 8, 
 static u8  trans_adv_data[ADV_RSP_PACKET_MAX];//max is 31
 static u8  trans_scan_rsp_data[ADV_RSP_PACKET_MAX];//max is 31
 static u8  trans_test_read_write_buf[4];
-static u16 trans_con_handle;
+//static u16 trans_con_handle;
+u16 trans_con_handle = 0;
 static adv_cfg_t trans_server_adv_config;
 //-------------------------------------------------------------------------------------
 static uint16_t trans_att_read_callback(hci_con_handle_t connection_handle, uint16_t att_handle, uint16_t offset, uint8_t *buffer, uint16_t buffer_size);
@@ -952,11 +953,14 @@ void bt_ble_init(void)
     log_info("%s\n", __FUNCTION__);
     log_info("ble_file: %s", __FILE__);
 
+    /*
 #if DOUBLE_BT_SAME_NAME
     ble_comm_set_config_name(bt_get_local_name(), 0);
 #else
     ble_comm_set_config_name(bt_get_local_name(), 1);
 #endif
+*/
+    ble_comm_set_config_name("AC6328_UART", 0);
     trans_con_handle = 0;
     trans_server_init();
 

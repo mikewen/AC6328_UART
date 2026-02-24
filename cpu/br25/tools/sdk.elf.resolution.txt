@@ -2260,7 +2260,11 @@ obj/Release/apps/spp_and_le/app_main.o
 -r=obj/Release/apps/spp_and_le/app_main.o,app_var_init,pl
 -r=obj/Release/apps/spp_and_le/app_main.o,get_charge_online_flag,l
 -r=obj/Release/apps/spp_and_le/app_main.o,check_power_on_key,pl
+-r=obj/Release/apps/spp_and_le/app_main.o,TestPrint,pl
 -r=obj/Release/apps/spp_and_le/app_main.o,app_main,pl
+-r=obj/Release/apps/spp_and_le/app_main.o,uart_dev_open,l
+-r=obj/Release/apps/spp_and_le/app_main.o,os_task_create,l
+-r=obj/Release/apps/spp_and_le/app_main.o,sys_timer_add,l
 -r=obj/Release/apps/spp_and_le/app_main.o,update_result_deal,l
 -r=obj/Release/apps/spp_and_le/app_main.o,vbat_check_init,l
 -r=obj/Release/apps/spp_and_le/app_main.o,check_power_on_voltage,l
@@ -2270,9 +2274,14 @@ obj/Release/apps/spp_and_le/app_main.o
 -r=obj/Release/apps/spp_and_le/app_main.o,get_current_app,l
 -r=obj/Release/apps/spp_and_le/app_main.o,eSystemConfirmStopStatus,pl
 -r=obj/Release/apps/spp_and_le/app_main.o,__errno,pl
+-r=obj/Release/apps/spp_and_le/app_main.o,os_sem_post,
+-r=obj/Release/apps/spp_and_le/app_main.o,os_sem_create,
+-r=obj/Release/apps/spp_and_le/app_main.o,os_sem_pend,l
 -r=obj/Release/apps/spp_and_le/app_main.o,puts,l
 -r=obj/Release/apps/spp_and_le/app_main.o,task_info_table,pl
 -r=obj/Release/apps/spp_and_le/app_main.o,app_var,pl
+-r=obj/Release/apps/spp_and_le/app_main.o,uart_cfg,pl
+-r=obj/Release/apps/spp_and_le/app_main.o,rx_semaphore,pl
 -r=obj/Release/apps/spp_and_le/app_main.o,config_update_mode,l
 -r=obj/Release/apps/spp_and_le/app_main.o,log_tag_const_i_APP,l
 obj/Release/apps/spp_and_le/config/lib_btctrler_config.o
@@ -3172,7 +3181,6 @@ obj/Release/apps/spp_and_le/examples/trans_data/ble_trans.o
 -r=obj/Release/apps/spp_and_le/examples/trans_data/ble_trans.o,ble_trans_flow_enable,pl
 -r=obj/Release/apps/spp_and_le/examples/trans_data/ble_trans.o,bt_ble_init,pl
 -r=obj/Release/apps/spp_and_le/examples/trans_data/ble_trans.o,ble_comm_set_config_name,l
--r=obj/Release/apps/spp_and_le/examples/trans_data/ble_trans.o,bt_get_local_name,l
 -r=obj/Release/apps/spp_and_le/examples/trans_data/ble_trans.o,ble_module_enable,pl
 -r=obj/Release/apps/spp_and_le/examples/trans_data/ble_trans.o,bt_ble_exit,pl
 -r=obj/Release/apps/spp_and_le/examples/trans_data/ble_trans.o,ble_comm_exit,l

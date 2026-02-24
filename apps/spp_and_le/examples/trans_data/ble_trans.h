@@ -16,4 +16,6 @@ int trans_client_search_remote_stop(u16 conn_handle);
 
 void trans_ios_services_init(void);
 void trans_ios_services_exit(void);
+
+extern u16 trans_con_handle;
 #endif
