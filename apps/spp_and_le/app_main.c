@@ -128,19 +128,27 @@ static void my_uart_rx_callback(void *bus, u32 status)
     }
 }
 
-static uint8_t rx_buffer[32];   // must be 2^n (e.g., 64, 128, 256...)
+#define RX_BUFFER_SIZE   256
+#define MSG_BUFFER_SIZE  20     //BLE Default MTU payload is 20 bytes.
+#define TASK_STACK_SIZE  512
+#define UART_TASK_PRIO   4
+
+//static uint8_t rx_buffer[512];   // must be 2^n (e.g., 64, 128, 256...)
+static uint8_t rx_buffer[RX_BUFFER_SIZE];
 
 struct uart_platform_data_t uart_cfg = {
     .tx_pin       = IO_PORT_DP ,
     .rx_pin       = IO_PORT_DM ,
     .rx_cbuf      = rx_buffer,
     .rx_cbuf_size = sizeof(rx_buffer),
-    .frame_length = 1,          // interrupt after each byte (or desired threshold)
+    //.frame_length = 1,          // interrupt after each byte (or desired threshold)
+    .frame_length = 16,
     .rx_timeout   = 10,         // timeout in ms (for OT interrupt)
     .isr_cbfun    = my_uart_rx_callback,
     .argv         = NULL,       // optional user data passed to callback
     .is_9bit      = 0,
     .baud         = 115200,
+    //.baud         = 19200,  // For Torqeedo
     // other fields (if any) should be zeroed
 };
 
@@ -167,13 +175,21 @@ static void uart_rx_task(void *p_arg)
 //extern u16 trans_con_handle;
 #define ATT_CHARACTERISTIC_ae02_01_CLIENT_CONFIGURATION_HANDLE 0x000d
 #define ATT_CHARACTERISTIC_ae02_01_VALUE_HANDLE 0x000c
+static volatile u8 g_ble_notify_enabled = 0;
+
+// Helper to update BLE notification state (Call this from your BLE event callback)
+void app_set_ble_notify_status(u8 enable) {
+    g_ble_notify_enabled = enable;
+}
 
 static void uart_rx_task(void *p_arg)
 {
     const uart_bus_t *uart_bus = (const uart_bus_t *)p_arg;
     uint8_t byte;
     // Buffer for accumulating a message (optional)
-    uint8_t msg_buffer[16];
+    //uint8_t msg_buffer[16];
+    //uint8_t msg_buffer[16];
+    uint8_t msg_buffer[MSG_BUFFER_SIZE];
     uint32_t msg_len = 0;
 
     while (1) {
@@ -183,7 +199,7 @@ static void uart_rx_task(void *p_arg)
         // Read all available bytes (non‑blocking inside the task)
         while (uart_bus->getbyte(&byte, 0)) {
             // Echo the byte back (optional)
-            uart_bus->putbyte(byte);
+            //uart_bus->putbyte(byte);
 
             // Store byte in message buffer if you want to send larger chunks
             if (msg_len < sizeof(msg_buffer)) {
@@ -197,6 +213,7 @@ static void uart_rx_task(void *p_arg)
             }
         }
 
+        /*
         // If we have accumulated data and BLE is ready, send it
         if (msg_len > 0 && trans_con_handle) {
             //uart_bus->write("SEND\n", 5);
@@ -208,15 +225,17 @@ static void uart_rx_task(void *p_arg)
                                                  msg_buffer,
                                                  msg_len,
                                                  0);
-                /*
-                if (ret) {
-                    uart_bus->write("failed\n", 7);
-                } else {
-                    uart_bus->write("Sent\n", 5);
-                }
-                */
             }
             msg_len = 0; // reset buffer for next message
+        } */
+        // Send via BLE if connected and notifications enabled
+        if (msg_len > 0 && trans_con_handle && g_ble_notify_enabled) {
+            // Fixed Macro Names (Removed spaces)
+            int ret = ble_comm_att_send_data(trans_con_handle,
+                                             ATT_CHARACTERISTIC_ae02_01_VALUE_HANDLE,
+                                             msg_buffer,
+                                             msg_len,
+                                             0);
         }
 
         clr_wdt();
@@ -238,14 +257,14 @@ void app_main()
     UT_OSSemCreate(&rx_semaphore, 0);
     //const uart_bus_t *uart_bus = uart_dev_open(&uart_cfg);
     const uart_bus_t *uart_bus = uart_dev_open(&uart_cfg);
-    int ret = os_task_create(
-        uart_rx_task,
-        (void *)uart_bus,
-        15,
-        128,                    // stack size in bytes (or words? check SDK docs)
-        0,                      // queue size (0 if not used)
-        "uart_rx"               // task name (for debugging)
-    );
+    if (uart_bus) {
+        ble_trans_init(uart_bus);
+    }
+
+    //int ret = os_task_create(uart_rx_task,(void *)uart_bus,15,128,0,"uart_rx");
+    int ret = os_task_create(uart_rx_task, (void *)uart_bus,
+                             UART_TASK_PRIO, TASK_STACK_SIZE,
+                             0, "uart_rx");
     //timerID = sys_timer_add((void *)uart_bus, TestPrint , 1000);
 
     struct intent it;

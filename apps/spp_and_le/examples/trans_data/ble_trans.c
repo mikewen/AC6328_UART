@@ -119,6 +119,23 @@ static u8  trans_scan_rsp_data[ADV_RSP_PACKET_MAX];//max is 31
 static u8  trans_test_read_write_buf[4];
 //static u16 trans_con_handle;
 u16 trans_con_handle = 0;
+
+static const uart_bus_t *g_uart = NULL;
+void ble_trans_init(const uart_bus_t *uart){
+    g_uart = uart;
+}
+
+static void uart_write(const char *str, int len){
+    if (g_uart && str && len > 0) {
+        g_uart->write((const uint8_t *)str, len);
+    }
+}
+static void uart_write_str(const char *str){
+    if (g_uart && str) {
+        uart_write(str, strlen(str));
+    }
+}
+
 static adv_cfg_t trans_server_adv_config;
 //-------------------------------------------------------------------------------------
 static uint16_t trans_att_read_callback(hci_con_handle_t connection_handle, uint16_t att_handle, uint16_t offset, uint8_t *buffer, uint16_t buffer_size);
@@ -375,6 +392,7 @@ static int trans_event_packet_handler(int event, u8 *packet, u16 size, u8 *ext_p
     case GATT_COMM_EVENT_CONNECTION_COMPLETE:
         trans_con_handle = little_endian_read_16(packet, 0);
         trans_connection_update_enable = 1;
+        app_set_ble_notify_status(true);
 
         log_info("connection_handle:%04x\n", little_endian_read_16(packet, 0));
         log_info("connection_handle:%04x, rssi= %d\n", trans_con_handle, ble_vendor_get_peer_rssi(trans_con_handle));
@@ -412,6 +430,7 @@ static int trans_event_packet_handler(int event, u8 *packet, u16 size, u8 *ext_p
             trans_client_search_remote_stop(trans_con_handle);
 #endif
             trans_con_handle = 0;
+            app_set_ble_notify_status(false);
         }
         break;
 
@@ -594,6 +613,9 @@ static int trans_att_write_callback(hci_con_handle_t connection_handle, uint16_t
         break;
 
     case ATT_CHARACTERISTIC_ae10_01_VALUE_HANDLE:
+        uart_write((const char *)buffer, buffer_size);
+        break;
+        /*
         tmp16 = sizeof(trans_test_read_write_buf);
         if ((offset >= tmp16) || (offset + buffer_size) > tmp16) {
             break;
@@ -602,6 +624,7 @@ static int trans_att_write_callback(hci_con_handle_t connection_handle, uint16_t
         log_info("\n-ae10_rx(%d):", buffer_size);
         put_buf(buffer, buffer_size);
         break;
+        */
 
     case ATT_CHARACTERISTIC_ae01_01_VALUE_HANDLE:
 
