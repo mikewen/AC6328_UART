@@ -496,6 +496,11 @@ static int trans_event_packet_handler(int event, u8 *packet, u16 size, u8 *ext_p
 // @param offset defines start of attribute value
 // @param buffer
 // @param buffer_size
+
+//extern u16 currentSensor_mv;
+#define AE10_RESP_FMT             "V%u"
+#define AE10_RESP_MAX_LEN         8
+
 static uint16_t trans_att_read_callback(hci_con_handle_t connection_handle, uint16_t att_handle, uint16_t offset, uint8_t *buffer, uint16_t buffer_size)
 {
     uint16_t  att_value_len = 0;
@@ -520,7 +525,8 @@ static uint16_t trans_att_read_callback(hci_con_handle_t connection_handle, uint
     }
     break;
 
-    case ATT_CHARACTERISTIC_ae10_01_VALUE_HANDLE:
+//    case ATT_CHARACTERISTIC_ae10_01_VALUE_HANDLE:
+        /*
         att_value_len = sizeof(trans_test_read_write_buf);
         if ((offset >= att_value_len) || (offset + buffer_size) > att_value_len) {
             break;
@@ -531,6 +537,30 @@ static uint16_t trans_att_read_callback(hci_con_handle_t connection_handle, uint
             att_value_len = buffer_size;
         }
         break;
+        */
+    case ATT_CHARACTERISTIC_ae10_01_VALUE_HANDLE: {
+        char temp_buf[AE10_RESP_MAX_LEN];
+        uint16_t currentSensor_mv = adc_get_voltage(AD_CH_PA9);
+
+        // Always calculate the string first
+        int len = snprintf(temp_buf, AE10_RESP_MAX_LEN, AE10_RESP_FMT, currentSensor_mv);
+        att_value_len = (uint16_t)len;
+
+        if (buffer) {
+            // Check offset to prevent memory corruption
+            if (offset < att_value_len) {
+                uint16_t bytes_to_copy = att_value_len - offset;
+                if (bytes_to_copy > buffer_size) bytes_to_copy = buffer_size;
+
+                memcpy(buffer, &temp_buf[offset], bytes_to_copy);
+                att_value_len = bytes_to_copy;
+            } else {
+                att_value_len = 0;
+            }
+        }
+    }
+    break;
+
 
     case ATT_CHARACTERISTIC_ae04_01_CLIENT_CONFIGURATION_HANDLE:
     case ATT_CHARACTERISTIC_ae02_01_CLIENT_CONFIGURATION_HANDLE:

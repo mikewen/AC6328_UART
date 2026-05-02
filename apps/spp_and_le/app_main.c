@@ -147,8 +147,8 @@ struct uart_platform_data_t uart_cfg = {
     .isr_cbfun    = my_uart_rx_callback,
     .argv         = NULL,       // optional user data passed to callback
     .is_9bit      = 0,
-    .baud         = 115200,
-    //.baud         = 19200,  // For Torqeedo
+    //.baud         = 115200,
+    .baud         = 19200,  // For Torqeedo
     // other fields (if any) should be zeroed
 };
 
@@ -242,14 +242,25 @@ static void uart_rx_task(void *p_arg)
         // No os_time_dly needed – we block on semaphore
     }
 }
-
+/*
 void TestPrint(void *priv)
 {
     const uart_bus_t *uart_bus = (const uart_bus_t *)priv;
     // Now you can use uart_bus, for example:
     uart_bus->write("Good\r\n", 8);
 }
+*/
 
+#define ADC 1
+
+/*
+#if ADC
+u16 currentSensor_mv = 0;
+void readCurrentADC(){
+    currentSensor_mv = adc_get_voltage(AD_CH_PA9);
+}
+#endif
+*/
 
 //static u16 timerID;
 void app_main()
@@ -266,6 +277,15 @@ void app_main()
                              UART_TASK_PRIO, TASK_STACK_SIZE,
                              0, "uart_rx");
     //timerID = sys_timer_add((void *)uart_bus, TestPrint , 1000);
+
+#if ADC
+#define sampleMS 100
+    gpio_set_dieh(AD_CH_PA9, 0);gpio_set_die(AD_CH_PA9, 0);gpio_set_pull_down(AD_CH_PA9, 1);gpio_set_pull_up(AD_CH_PA9, 0);
+    gpio_set_direction(AD_CH_PA9, 1);
+    adc_add_sample_ch(AD_CH_PA9);adc_set_sample_freq(AD_CH_PA9, sampleMS);
+    //u16 timerID = sys_timer_add(NULL, readCurrentADC, sampleMS); // 1Hz
+
+#endif
 
     struct intent it;
 
